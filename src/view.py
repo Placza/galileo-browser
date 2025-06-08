@@ -15,6 +15,7 @@ class View:
         self.root = root
         self.width = width
         self.height = height
+        self.content = ''
         self.display_list = []
         self.HSTEP = 13
         self.VSTEP = 18
@@ -23,9 +24,9 @@ class View:
         self.page_size = 0
         self.layout = None
 
-    def load(self, text):
+    def load(self):
         self.scroll = 0
-        tokens = self.lex(text)
+        tokens = self.lex(self.content)
         self.layout = Layout(tokens, self.width, self.height)
         self.display_list = self.layout.display_list
         self.page_size = self.layout.page_size
@@ -55,8 +56,7 @@ class View:
         self.width = event.width
         if self.page_size - self.height <= self.scroll:
             self.scroll = max(0, min(self.scroll, self.page_size - self.height))
-
-        self.render()
+        self.load()
 
     def scrolldown(self, event):
         if self.page_size - self.height > self.scroll:
@@ -125,6 +125,8 @@ class View:
 class Layout:
     def __init__(self, tokens, width, height):
         self.display_list = []
+        self.line = []
+        self.fonts = {}
         self.width = width
         self.height = height
         self.HSTEP = 13
@@ -133,23 +135,46 @@ class Layout:
         self.cursor_y = self.VSTEP
         self.weight = 'normal'
         self.style = 'roman'
+        self.align = 'left'
+        self.placement = 0
         self.size = 12
         for tok in tokens:
             self.token(tok)
-        t1, self.page_size, t2, t3 = self.display_list[len(self.display_list) - 1]
+        self.flush()
+        self.page_size = 0
+        if self.display_list:
+            t1, self.page_size, t2, t3 = self.display_list[len(self.display_list) - 1]
+
+    def get_font(self, size, weight, style):
+        key = (size, weight, style)
+        if key not in self.fonts:
+            font = tkinter.font.Font(size=size, weight=weight, slant=style)
+            label = tkinter.Label(font=font)
+            self.fonts[key] = (font, label)
+        return self.fonts[key][0]
+
+    def flush(self, align = 'left'):
+        if not self.line: return
+        metrics = [font.metrics() for x, word, font, placement in self.line]
+        max_ascent = max([metric['ascent'] for metric in metrics])
+        baseline = self.cursor_y + 1.25 * max_ascent
+        line_center = sum(x[0] for x in self.line) / 2
+        for x, word, font, placement in self.line:
+            y = baseline - font.metrics('ascent') - placement
+            if align == 'center' : x += self.width / 2 - line_center / 2 
+            self.display_list.append((x, y, word, font))
+        max_descent = max([metric['descent'] for metric in metrics])
+        self.cursor_y = baseline + 1.25 * max_descent
+        self.cursor_x = self.HSTEP
+        self.line = []
 
     def word(self, word):
-        font = tkinter.font.Font(
-            size = self.size,
-            weight=self.weight,
-            slant=self.style
-        )
+        font = self.get_font(self.size, self.weight, self.style)
         w = font.measure(word)
-        self.display_list.append((self.cursor_x, self.cursor_y, word, font))
-        self.cursor_x += w + font.measure(' ')
         if self.cursor_x + w > self.width - self.HSTEP:
-            self.cursor_y += font.metrics('linespace') * 1.25
-            self.cursor_x = self.HSTEP
+            self.flush()
+        self.line.append((self.cursor_x, word, font, self.placement))
+        self.cursor_x += w + font.measure(' ')
 
     def token(self, tok):
         if isinstance(tok, Text):
@@ -171,5 +196,27 @@ class Layout:
             self.size += 4
         elif tok.tag == '/big':
             self.size -= 4
+        elif tok.tag == 'br':
+            self.flush()
+        elif tok.tag == '/p':
+            self.flush()
+            self.cursor_y += self.VSTEP
+        elif tok.tag == 'h1 class="title"':
+            self.align = 'center'
+            self.size += 5
+        elif tok.tag == '/h1':
+            self.flush(align=self.align)
+            if self.align == 'center' : self.size -= 5
+            self.align = 'left'
+        elif tok.tag == '/title':
+            self.flush()
+        elif tok.tag == 'sup':
+            self.size = round(self.size / 2) # change later so that the resize works for odd numbers too
+            self.placement += self.size
+        elif tok.tag == '/sup':
+            self.placement -= self.size
+            self.size *= 2
+
+  
         
         

@@ -31,7 +31,8 @@ class Browser:
     def search_web(self, addr, default_text):
         if addr.get() != default_text:
             url = network.URL(addr.get())
-            self.view.load(network.Socket(url).load_content())
+            self.view.content = network.Socket(url).load_content()
+            self.view.load()
 
     def select_all(self, event, addr):
         addr.focus_set()
