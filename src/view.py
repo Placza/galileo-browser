@@ -1,24 +1,61 @@
 import tkinter as tk
 import tkinter.ttk as ttk
+import tkinter.font
+
+class Text:
+    def __init__(self, text):
+        self.text = text
+
+class Tag:
+    def __init__(self, tag):
+        self.tag = tag
 
 class View:
     def __init__(self, root, width, height):
         self.root = root
         self.width = width
         self.height = height
-        self.content = ''
         self.display_list = []
         self.HSTEP = 13
         self.VSTEP = 18
         self.scroll = 0
         self.SCROLL_STEP = 50
         self.page_size = 0
+        self.layout = None
+
+    def load(self, text):
+        self.scroll = 0
+        tokens = self.lex(text)
+        self.layout = Layout(tokens, self.width, self.height)
+        self.display_list = self.layout.display_list
+        self.page_size = self.layout.page_size
+        self.render()  
+
+    def lex(self, body):
+        out = []
+        buffer = ''
+        in_tag = False
+        for c in body:
+            if c == '<':
+                in_tag = True
+                if buffer: out.append(Text(buffer))
+                buffer = ''
+            elif c == '>':
+                in_tag = False
+                out.append(Tag(buffer))
+                buffer = ''
+            else:
+                buffer += c
+        if not in_tag and buffer:
+            out.append(Text(buffer))
+        return out
 
     def resize(self, event):
         self.height = event.height
         self.width = event.width
         if self.page_size - self.height <= self.scroll:
             self.scroll = max(0, min(self.scroll, self.page_size - self.height))
+
         self.render()
 
     def scrolldown(self, event):
@@ -30,10 +67,6 @@ class View:
         if self.scroll >= 0:
             self.scroll = max(0, min(self.scroll - self.SCROLL_STEP, self.page_size - self.height))
             self.render()
-
-        self.render()
-    def mouse_wheel(self, event):
-        print(event.delta)
 
     def update_scrollbar(self):
         if self.page_size <= self.height:
@@ -81,25 +114,53 @@ class View:
         self.scrollbar.pack(side='right', fill='y', padx=(0, 2), pady=5)
         self.scrollbar.set(0, 0)
 
-    def layout(self, text):
-        self.display_list.clear()
-        cursor_x, cursor_y = self.HSTEP, self.VSTEP
-        for c in text:
-            self.display_list.append((cursor_x, cursor_y, c))
-            cursor_x += self.HSTEP
-            if cursor_x >= self.width - 7 or c == '\n':
-                cursor_x = self.HSTEP
-                cursor_y += self.VSTEP
-        if len(self.display_list):
-            x, self.page_size, temp = self.display_list[len(self.display_list) - 1]
-
     def render(self):
         self.canvas.delete('all')
-        self.layout(self.content)
-        
         self.update_scrollbar()
-        top, bottom = 0, 0
-        for x, y, c in self.display_list:
+        for x, y, c, font in self.display_list:
             if y > self.scroll + self.height: continue
             if y + self.VSTEP < self.scroll: continue
-            self.canvas.create_text(x, y - self.scroll, text=c)
+            self.canvas.create_text(x, y - self.scroll, text=c, anchor='nw', font=font)
+
+class Layout:
+    def __init__(self, tokens, width, height):
+        self.display_list = []
+        self.width = width
+        self.height = height
+        self.HSTEP = 13
+        self.VSTEP = 18
+        self.cursor_x = self.HSTEP
+        self.cursor_y = self.VSTEP
+        self.weight = 'normal'
+        self.style = 'roman'
+        for tok in tokens:
+            self.token(tok)
+        t1, self.page_size, t2, t3 = self.display_list[len(self.display_list) - 1]
+
+    def word(self, word):
+        font = tkinter.font.Font(
+            size = 16,
+            weight=self.weight,
+            slant=self.style
+        )
+        w = font.measure(word)
+        self.display_list.append((self.cursor_x, self.cursor_y, word, font))
+        self.cursor_x += w + font.measure(' ')
+        if self.cursor_x + w > self.width - self.HSTEP:
+            self.cursor_y += font.metrics('linespace') * 1.25
+            self.cursor_x = self.HSTEP
+
+    def token(self, tok):
+        if isinstance(tok, Text):
+            for word in tok.text.split():
+                self.word(word)
+        elif tok.tag == 'i':
+            self.style = 'italic'
+        elif tok.tag == '/i':
+            self.style = 'roman'
+        elif tok.tag == 'b':
+            self.weight = 'bold'
+        elif tok.tag == '/b':
+            self.weight = 'normal'
+        
+        

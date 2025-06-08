@@ -48,31 +48,19 @@ class Socket:
         
         return content
     
-    def lex(self, body):
-        text = ''
-        in_tag = False
-        for c in body:
-            if c == '<':
-                in_tag = True
-            elif c == '>':
-                in_tag = False
-            elif not in_tag:
-                text += c
-        return text
-    
     def load_content(self):
         text = ''
         if self.url.scheme != 'file':
             self.connect()
             self.request()
-            text = self.lex(self.response())
+            text = self.response()
         else:
             text = '2'
         return text
 
 class URL:
     def __init__(self, url):
-        self.scheme, url = url.split('://', 1)
+        self.scheme, url = url.split('://', 2)
         assert self.scheme in ['http', 'https', 'file']
         
         if '/' not in url:

@@ -18,21 +18,20 @@ class Browser:
         self.renderUI()
         tk.mainloop()
 
-    def on_entry_click(self, event, addr):
-        if addr.get() == 'Start searching the web by writing an address':
+    def on_entry_click(self, event, addr, default_text):
+        if addr.get() == default_text:
             addr.delete(0, 'end')
             addr.config(fg='black')
     
-    def on_focusout(self, event, addr):
+    def on_focusout(self, event, addr, default_text):
         if addr.get() == '':
-            addr.insert(0, 'Start searching the web by writing an address')
+            addr.insert(0, default_text)
             addr.config(fg='gray')
 
-    def search_web(self, addr):
-        if addr.get() != 'Start searching the web by writing an address':
+    def search_web(self, addr, default_text):
+        if addr.get() != default_text:
             url = network.URL(addr.get())
-            self.view.content = network.Socket(url).load_content()
-            self.view.render()
+            self.view.load(network.Socket(url).load_content())
 
     def select_all(self, event, addr):
         addr.focus_set()
@@ -51,14 +50,15 @@ class Browser:
         header_top.pack(side='top', fill='x')
 
         addr = tk.Entry(header_bottom, fg='gray')
-        addr.insert(0, 'Start searching the web by writing an address')
-        addr.bind('<FocusIn>', lambda event : self.on_entry_click(event, addr))
-        addr.bind('<FocusOut>', lambda event : self.on_focusout(event, addr))
+        default_text = 'Start searching the web by writing an address'
+        addr.insert(0, default_text)
+        addr.bind('<FocusIn>', lambda event : self.on_entry_click(event, addr, default_text))
+        addr.bind('<FocusOut>', lambda event : self.on_focusout(event, addr, default_text))
         addr.bind('<Control-a>', lambda event : self.select_all(event, addr))
-        addr.bind('<Return>', lambda event : self.search_web(addr))
+        addr.bind('<Return>', lambda event : self.search_web(addr, default_text))
 
         self.search_icon = tk.PhotoImage(file='assets/magnifier.png')
-        search = tk.Button(header_bottom, image=self.search_icon, command=lambda : self.search_web(addr))
+        search = tk.Button(header_bottom, image=self.search_icon, command=lambda : self.search_web(addr, default_text))
         search.pack(side='left', padx=(100, 0), pady=10)
         
         addr.pack(side='left', fill='x', expand=True, padx=(0, 10), pady=10)
