@@ -25,7 +25,6 @@ class View:
         self.layout = None
 
     def load(self):
-        self.scroll = 0
         tokens = self.lex(self.content)
         self.layout = Layout(tokens, self.width, self.height)
         self.display_list = self.layout.display_list

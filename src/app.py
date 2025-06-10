@@ -32,6 +32,7 @@ class Browser:
         if addr.get() != default_text:
             url = network.URL(addr.get())
             self.view.content = network.Socket(url).load_content()
+            self.view.scroll = 0
             self.view.load()
 
     def select_all(self, event, addr):
