@@ -1,2 +1,6 @@
 .DS_Store
+<<<<<<< HEAD
 .pyc
+=======
+src/__pycache__/
+>>>>>>> main
