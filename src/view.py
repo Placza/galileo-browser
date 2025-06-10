@@ -3,14 +3,6 @@ import tkinter.ttk as ttk
 import tkinter.font
 from . import htmlparser as htmlp
 
-class Text:
-    def __init__(self, text):
-        self.text = text
-
-class Tag:
-    def __init__(self, tag):
-        self.tag = tag
-
 class View:
     def __init__(self, root, width, height):
         self.root = root
@@ -26,30 +18,13 @@ class View:
         self.layout = None
 
     def load(self):
-        self.nodes = htmlp.HTMLParser(self.content).parse()
-        self.layout = Layout(self.nodes, self.width, self.height)
-        self.display_list = self.layout.display_list
-        self.page_size = self.layout.page_size
-        self.render()  
-
-    def lex(self, body):
-        out = []
-        buffer = ''
-        in_tag = False
-        for c in body:
-            if c == '<':
-                in_tag = True
-                if buffer: out.append(Text(buffer))
-                buffer = ''
-            elif c == '>':
-                in_tag = False
-                out.append(Tag(buffer))
-                buffer = ''
-            else:
-                buffer += c
-        if not in_tag and buffer:
-            out.append(Text(buffer))
-        return out
+        if self.content:
+            parser = htmlp.HTMLParser(self.content)
+            self.nodes = parser.parse()
+            self.layout = Layout(self.nodes, self.width, self.height)
+            self.display_list = self.layout.display_list
+            self.page_size = self.layout.page_size
+            self.render()  
 
     def resize(self, event):
         self.height = event.height
@@ -123,7 +98,7 @@ class View:
             self.canvas.create_text(x, y - self.scroll, text=c, anchor='nw', font=font)
 
 class Layout:
-    def __init__(self, tokens, width, height):
+    def __init__(self, nodes, width, height):
         self.display_list = []
         self.line = []
         self.fonts = {}
@@ -138,7 +113,9 @@ class Layout:
         self.align = 'left'
         self.placement = 0
         self.size = 12
-        self.page_size = 0
+        self.recurse(nodes)
+        if self.display_list:
+            a, self.page_size, b, c = self.display_list[-1]
 
     def get_font(self, size, weight, style):
         key = (size, weight, style)
@@ -214,7 +191,7 @@ class Layout:
             self.size *= 2
 
     def recurse(self, tree):
-        if isinstance(tree, Text):
+        if isinstance(tree, htmlp.Text):
             for word in tree.text.split():
                 self.word(word)
         else:
