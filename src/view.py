@@ -1,6 +1,7 @@
 import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.font
+from . import htmlparser as htmlp
 
 class Text:
     def __init__(self, text):
@@ -25,8 +26,8 @@ class View:
         self.layout = None
 
     def load(self):
-        tokens = self.lex(self.content)
-        self.layout = Layout(tokens, self.width, self.height)
+        self.nodes = htmlp.HTMLParser(self.content).parse()
+        self.layout = Layout(self.nodes, self.width, self.height)
         self.display_list = self.layout.display_list
         self.page_size = self.layout.page_size
         self.render()  
@@ -137,12 +138,7 @@ class Layout:
         self.align = 'left'
         self.placement = 0
         self.size = 12
-        for tok in tokens:
-            self.token(tok)
-        self.flush()
         self.page_size = 0
-        if self.display_list:
-            t1, self.page_size, t2, t3 = self.display_list[len(self.display_list) - 1]
 
     def get_font(self, size, weight, style):
         key = (size, weight, style)
@@ -175,47 +171,57 @@ class Layout:
         self.line.append((self.cursor_x, word, font, self.placement))
         self.cursor_x += w + font.measure(' ')
 
-    def token(self, tok):
-        if isinstance(tok, Text):
-            for word in tok.text.split():
-                self.word(word)
-        elif tok.tag == 'i':
+    def open_tag(self, tag):
+        if tag == 'i':
             self.style = 'italic'
-        elif tok.tag == '/i':
-            self.style = 'roman'
-        elif tok.tag == 'b':
-            self.weight = 'bold'
-        elif tok.tag == '/b':
-            self.weight = 'normal'
-        elif tok.tag == 'small':
+        elif tag == 'b':
+            self.style = 'bold'
+        elif tag == 'small':
             self.size -= 2
-        elif tok.tag == '/small':
-            self.size += 2
-        elif tok.tag == 'big':
+        elif tag == 'big':
             self.size += 4
-        elif tok.tag == '/big':
-            self.size -= 4
-        elif tok.tag == 'br':
+        elif tag == 'br':
             self.flush()
-        elif tok.tag == '/p':
-            self.flush()
-            self.cursor_y += self.VSTEP
-        elif tok.tag == 'h1 class="title"':
+        elif tag == 'h1':
             self.align = 'center'
             self.size += 5
-        elif tok.tag == '/h1':
+        elif tag == 'sup':
+            self.size = round(self.size / 2) # change later so that the resize works for odd numbers too
+            self.placement += self.size
+
+    def close_tag(self, tag):
+        if tag == 'i':
+            self.style = 'roman'
+        elif tag == 'b':
+            self.weight = 'normal'
+        elif tag == 'small':
+            self.size += 2
+        elif tag == 'big':
+            self.size -= 4
+        elif tag == 'br':
+            self.flush()
+        elif tag == 'p':
+            self.flush()
+            self.cursor_y += self.VSTEP
+        elif tag == 'h1':
             self.flush(align=self.align)
             if self.align == 'center' : self.size -= 5
             self.align = 'left'
-        elif tok.tag == '/title':
+        elif tag == 'title':
             self.flush()
-        elif tok.tag == 'sup':
-            self.size = round(self.size / 2) # change later so that the resize works for odd numbers too
-            self.placement += self.size
-        elif tok.tag == '/sup':
+        elif tag == 'sup':
             self.placement -= self.size
             self.size *= 2
 
+    def recurse(self, tree):
+        if isinstance(tree, Text):
+            for word in tree.text.split():
+                self.word(word)
+        else:
+            self.open_tag(tree.tag)
+            for child in tree.children:
+                self.recurse(child)
+            self.close_tag(tree.tag)
   
         
         
